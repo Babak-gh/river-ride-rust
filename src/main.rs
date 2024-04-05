@@ -5,15 +5,24 @@ use crossterm::{
     cursor::{Hide, MoveTo, Show}, event::{self, poll,read, Event, KeyCode}, execute, style::{ Print}, terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType}, ExecutableCommand, QueueableCommand
 };
 
+
+struct Location{
+    c: u16,
+    l: u16
+}
+struct Enemy{
+    location: Location
+}
+
 struct World{
-    player_c:u16,
-    player_l:u16,
+    player_location: Location,
     maxc: u16,
     maxl:u16,
     map: Vec<(u16,u16)>,
     is_died: bool,
     next_start: u16,
     next_end: u16,
+    enemies: Vec<Enemy>
 }
 
 fn draw(mut scr: &Stdout, mut world: &World) -> std::io::Result<()>{
@@ -28,8 +37,14 @@ fn draw(mut scr: &Stdout, mut world: &World) -> std::io::Result<()>{
     }
 
     // draw player
-    scr.queue(MoveTo(world.player_c,world.player_l))?;
+    scr.queue(MoveTo(world.player_location.c,world.player_location.l))?;
     scr.queue(Print("P"))?;
+
+    //draw enemies
+    for e in 0..world.enemies.len() {
+        scr.queue(MoveTo(world.enemies[e].location.c, world.enemies[e].location.l))?;
+        scr.queue(Print("E"))?;
+    }
 
     scr.flush()?;
     Ok(())
@@ -37,7 +52,7 @@ fn draw(mut scr: &Stdout, mut world: &World) -> std::io::Result<()>{
 
 fn physics(mut world: World) -> std::io::Result<World> {
 
-    if world.player_c >= world.map[world.player_l as usize].1 || world.player_c <= world.map[world.player_l as usize].0 {
+    if world.player_location.c >= world.map[world.player_location.l as usize].1 || world.player_location.c <= world.map[world.player_location.l as usize].0 {
         world.is_died = true;
     }
 
@@ -69,7 +84,17 @@ fn physics(mut world: World) -> std::io::Result<World> {
         }
     }
 
-    
+    if rng.gen_range(0..10) >= 9 {
+        world.enemies.push(Enemy { location: Location { c: rng.gen_range(world.map[0].0..world.map[0].1), l: 0 } })
+    }
+
+    for e in (0..world.enemies.len()).rev() {
+        world.enemies[e].location.l += 1;
+        if world.enemies[e].location.l == world.maxl {
+            world.enemies.remove(e);
+        }
+    }
+
 
     Ok(world)
 }
@@ -85,18 +110,21 @@ fn main() -> std::io::Result<()> {
 
     // init the game
     let mut world = World{
-        player_c : max_c/2,
-        player_l : max_l - 1,
+        player_location: Location{
+            c:max_c/2,
+            l:max_l - 1,
+        },
         maxc: max_c,
         maxl: max_l,
         map: vec![((max_c/2) -5 , (max_c/2)+5);max_l as usize],
         is_died: false,
         next_start: (max_c/2) - 10,
-        next_end:  (max_c/2) + 10
+        next_end:  (max_c/2) + 10,
+        enemies: vec![]
     };
 
     while  !world.is_died {
-            // `poll()` waits for an `Event` for a given time period
+        
             if poll(Duration::from_millis(10))? {
                 let key = read().unwrap();
                 while poll(Duration::from_millis(0)).unwrap() {
@@ -109,23 +137,23 @@ fn main() -> std::io::Result<()> {
                                 break;
                             }
                             KeyCode::Char('w') => {
-                                if world.player_l > 1 {
-                                    world.player_l -= 1;
+                                if world.player_location.l > 1 {
+                                    world.player_location.l -= 1;
                                 }
                             }
                             KeyCode::Char('s') => {
-                                if world.player_l < max_l - 1 {
-                                    world.player_l += 1;
+                                if world.player_location.l < max_l - 1 {
+                                    world.player_location.l += 1;
                                 }
                             }
                             KeyCode::Char('d') => {
-                                if world.player_c < max_c - 1 {
-                                    world.player_c += 1;
+                                if world.player_location.c < max_c - 1 {
+                                    world.player_location.c += 1;
                                 }
                             }
                             KeyCode::Char('a') => {
-                                if world.player_c > 1 {
-                                    world.player_c -= 1;
+                                if world.player_location.c > 1 {
+                                    world.player_location.c -= 1;
                                 }
                             }
                             _ => {}
