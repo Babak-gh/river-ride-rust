@@ -1,6 +1,6 @@
 use std::{io::{stdout, Stdout, Write}, time::Duration, vec};
 use std::{thread, time};
-
+use rand::Rng;
 use crossterm::{
     cursor::{Hide, MoveTo, Show}, event::{self, poll,read, Event, KeyCode}, execute, style::{ Print}, terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType}, ExecutableCommand, QueueableCommand
 };
@@ -11,7 +11,9 @@ struct World{
     maxc: u16,
     maxl:u16,
     map: Vec<(u16,u16)>,
-    is_died: bool
+    is_died: bool,
+    next_start: u16,
+    next_end: u16,
 }
 
 fn draw(mut scr: &Stdout, mut world: &World) -> std::io::Result<()>{
@@ -36,15 +38,38 @@ fn draw(mut scr: &Stdout, mut world: &World) -> std::io::Result<()>{
 fn physics(mut world: World) -> std::io::Result<World> {
 
     if world.player_c >= world.map[world.player_l as usize].1 || world.player_c <= world.map[world.player_l as usize].0 {
-        print!("Fuck");
-        world.is_died = true
+        world.is_died = true;
     }
 
 
+    let mut rng = rand::thread_rng();
     for l in (0..world.map.len() - 1).rev() {
         world.map[l + 1] = world.map[l];
     }
-    world.map[0] = (20 , 80);
+
+    if rng.gen_range(0..10) >= 7{
+        if world.next_end < world.map[0].1 {
+            world.map[0].1 -= 1;
+        }
+        if world.next_end > world.map[0].1 {
+            world.map[0].1 += 1;
+        }
+        if world.next_start < world.map[0].0 {
+            world.map[0].0 -= 1;
+        }
+        if world.next_start > world.map[0].0 {
+            world.map[0].0 += 1;
+        }
+        if world.next_end == world.map[0].1 && world.next_start == world.map[0].0 {
+            world.next_start = rng.gen_range(world.map[0].0 - 5..world.map[0].1 - 5);
+            world.next_end = rng.gen_range(world.map[0].0 + 5..world.map[0].1 + 5);
+            if world.next_end - world.next_start <= 7 {
+                world.next_start -= 7;
+            }
+        }
+    }
+
+    
 
     Ok(world)
 }
@@ -65,7 +90,9 @@ fn main() -> std::io::Result<()> {
         maxc: max_c,
         maxl: max_l,
         map: vec![((max_c/2) -5 , (max_c/2)+5);max_l as usize],
-        is_died: false
+        is_died: false,
+        next_start: (max_c/2) - 10,
+        next_end:  (max_c/2) + 10
     };
 
     while  !world.is_died {
